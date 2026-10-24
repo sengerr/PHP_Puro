@@ -1,0 +1,13 @@
+# Local, filled-in settings -- never commit credentials.
+.env
+.env.*
+*.local.php
+# Label / document output written by your own scripts.
+*.pdf
+*.zpl
+*.png
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
