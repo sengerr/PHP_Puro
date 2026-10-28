@@ -1,5 +1,22 @@
-# Credentials and run state: never commit these
+# Local, filled-in settings: never commit credentials.
 .env
+.env.*
+!.env.example
+*.local.php
+
+# Run state written by the requests/ scripts (cached token, captured PINs)
 .state.json
-# Responses saved with --save (labels, documents)
+
+# Responses saved with --save, and scratch output
 output/
+
+# Label / document output written by your own scripts.
+*.pdf
+*.zpl
+*.png
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

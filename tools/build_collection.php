@@ -71,11 +71,18 @@ pm.environment.set('RequestReference', 'REQ' + now.getFullYear() + pad(now.getMo
     + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds()));
 JS;
 
-/** Request pre-request: shipment date = today + N days (Toronto). */
-function dateScript(int $days): string
+/** Request pre-request: shipment date = today + N days (Toronto); a run can override N. */
+function dateScript(int $days, ?string $overrideVar): string
 {
-    return "// Shipment date is today + {$days} day(s), in Purolator's time zone.\n"
-        . "pm.environment.set('Current_Date', new Date(Date.now() + {$days} * 86400000)\n"
+    $js = "// Shipment date is today + {$days} day(s), in Purolator's time zone.\n";
+    if ($overrideVar !== null) {
+        $js .= "// Set the variable {$overrideVar} to use another offset (for example 0 = ship today).\n"
+            . "const _ahead = pm.variables.get('{$overrideVar}');\n"
+            . "const DAYS_AHEAD = (_ahead === undefined || _ahead === null || _ahead === '') ? {$days} : Number(_ahead);\n";
+    } else {
+        $js .= "const DAYS_AHEAD = {$days};\n";
+    }
+    return $js . "pm.environment.set('Current_Date', new Date(Date.now() + DAYS_AHEAD * 86400000)\n"
         . "    .toLocaleDateString('en-CA', { timeZone: 'America/Toronto' }));";
 }
 
@@ -180,7 +187,7 @@ foreach ($tierNames as $tier => $label) {
 
         $events = [];
         if (isset($d['dateOffset'])) {
-            $events[] = ['listen' => 'prerequest', 'script' => ['type' => 'text/javascript', 'exec' => scriptLines(dateScript((int)$d['dateOffset']))]];
+            $events[] = ['listen' => 'prerequest', 'script' => ['type' => 'text/javascript', 'exec' => scriptLines(dateScript((int)$d['dateOffset'], $d['dateOffsetVar'] ?? null))]];
         }
         if (isset($d['capture'])) {
             $events[] = ['listen' => 'test', 'script' => ['type' => 'text/javascript', 'exec' => scriptLines(captureScript($d['capture']))]];
@@ -209,11 +216,17 @@ foreach ($tierNames as $tier => $label) {
     }
 
     $count = count($defs);
+    // Requests the source collection marks as aligned to the OpenAPI spec but not yet sent live.
+    $unverified = count(array_filter($defs, static fn(array $d): bool =>
+        stripos((string)($d['description'] ?? ''), 'not yet verified live') !== false));
+    $verifiedNote = $unverified > 0
+        ? "{$count} requests. {$unverified} of them are marked \"Spec-aligned, not yet verified live\" in their description; the rest were verified live against the Purolator Certification environment."
+        : "{$count} requests, each verified live against the Purolator Certification environment.";
     $collection = [
         'info' => [
             'name'        => "Purolator REST - {$label} (PHP_Puro)",
             'description' => "Purolator REST API requests, generated from the PHP scripts in PHP_Puro (tools/build_collection.php).\n\n"
-                . "{$count} requests, each verified live against the Purolator Certification environment. Host: {$t['baseUrl']} (scope {$t['authScope']}).\n\n"
+                . "{$verifiedNote} Host: {$t['baseUrl']} (scope {$t['authScope']}).\n\n"
                 . "Create a Postman environment with REST_ClientId, REST_Secret, REST_XApiKey, AccountNumber and Different_AccountNumber, "
                 . "run 00 - Auth first to fill REST_Token, then run each folder top to bottom. No credentials are stored here.",
             'schema'      => 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',

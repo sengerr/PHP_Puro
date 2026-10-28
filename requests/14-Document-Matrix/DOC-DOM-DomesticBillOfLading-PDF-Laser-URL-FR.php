@@ -33,10 +33,31 @@ Document matrix: DomesticBillOfLading from the Domestic seed created as PDF / La
 Reads {{PIN_DOM_PDF_URL_FR}}. documentCriteria carries only shipmentPIN and
 documentType -- every format field is rejected as unknown here;
 the format came from how the seed was created.
+
+<!-- developer-notes:begin (tooling/align_rest_to_spec.py; regenerated, do not edit) -->
+### Developer notes
+`POST /ship/v1/documents` -- Get Documents spec (GetDocumentsRequest). Get shipment documents
+
+Retrieve documents for one or more shipment PINs. Freight is not supported.
+
+**Headers:** Authorization Bearer `{{REST_Token}}` · `x-api-key` (required) · `Language` (optional) `EN` | `FR` · `RequestReference` (optional) max 36
+
+**Required fields** (top level, and inside every object this body sends): `lineOfBusiness`, `documentCriteria`, `documentCriteria[].shipmentPIN`
+
+**Fields in this body** (type, limits, accepted values; * = required):
+- `lineOfBusiness`* -- string; accepted: `Courier` | `Freight`. Line of business. Case-insensitive. Only Courier is supported.
+- `requestReference` -- string, max 36 chars. A unique identifier for the request. Can be used to match request with the response. If not provided, a random UUID is generated.
+- `documentCriteria`* -- array, 1-50 items
+- `documentCriteria[].shipmentPIN`* -- string
+- `documentCriteria[].documentType` -- array. Optional filter. When omitted, eligible documents for the shipment are returned.
+- `documentCriteria[].documentType[]` -- string; accepted: `CustomsInvoice` | `CustomsInvoiceThermal` | `DangerousGoodsDeclaration` | `DomesticBillOfLading` | `DomesticBillOfLadingThermal` | `ExpressChequeReceipt` | `ExpressChequeReceiptThermal` | `FDA2877` | `InternationalBillOfLading` | `InternationalBillOfLadingThermal` | `QRCode` | `USMCA`
+
+Full value lists: `docs/REST-enumerations-and-accepted-values.md`.
+<!-- developer-notes:end -->
 PURO_TEXT,
     'body' => <<<'PURO_BODY'
 {
-    "lineOfBusiness": "COURIER",
+    "lineOfBusiness": "Courier",
     "requestReference": "{{RequestReference}}",
     "documentCriteria": [
         {
