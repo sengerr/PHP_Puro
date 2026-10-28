@@ -39,6 +39,21 @@ final class Client
         'postalCode'               => 'M9A0A5',
     ];
 
+    /**
+     * Same settings under the names the examples/ scripts use, so credentials
+     * are set once for both script sets. PUROLATOR_VAR_<NAME> also works for any variable.
+     */
+    private const ENV_ALIASES = [
+        'REST_ClientId'           => 'PUROLATOR_CLIENT_ID',
+        'REST_Secret'             => 'PUROLATOR_CLIENT_SECRET',
+        'REST_XApiKey'            => 'PUROLATOR_X_API_KEY',
+        'AccountNumber'           => 'PUROLATOR_ACCOUNT',
+        'Different_AccountNumber' => 'PUROLATOR_ACCOUNT_2',
+        'REST_Token'              => 'PUROLATOR_TOKEN',
+        'language'                => 'PUROLATOR_LANGUAGE',
+        'shipDaysAhead'           => 'PUROLATOR_SHIP_DAYS_AHEAD',
+    ];
+
     /** Purolator validates dates in its own time zone, not the runner's. */
     private const CARRIER_TZ = 'America/Toronto';
 
@@ -64,7 +79,8 @@ final class Client
      * 0 = HTTP 2xx, 1 = other HTTP status, 2 = could not send (setup problem).
      *
      * @param array<string,mixed> $def
-     * @param list<string>        $args  --dry-run (print only), --save (write full response to output/)
+     * @param list<string>        $args  --dry-run (print only), --save (write full response to output/),
+     *                                  NAME=value (fill a {{NAME}} placeholder, e.g. trackingId2=329016612345)
      */
     public static function run(array $def, array $args = []): int
     {
@@ -76,29 +92,21 @@ final class Client
             self::loadEnvFile($root . '/.env');
             $tier  = self::tier();
             $state = self::readState($root);
-            $st    = $state[$tier] ?? [];
-            $dyn   = self::dynamicVars((int)($def['dateOffset'] ?? 0), isset($def['dateOffset']));
-            $get   = self::lookup($tier, $dyn, $st);
-            $strict = !$dry;   // a dry run may leave {{placeholders}} unresolved
 
-            $url     = self::resolve((string)$def['url'], $get, $strict);
-            $method  = (string)$def['method'];
-            $headers = [];
-            foreach (($def['headers'] ?? []) as $name => $value) {
-                $headers[(string)$name] = self::resolve((string)$value, $get, $strict);
+            // Resolve {{variables}}; a dry run may leave unresolved ones as they are.
+            $overrides = [];
+            foreach ($args as $a) {
+                if (!str_starts_with($a, '--') && preg_match('/^([A-Za-z0-9_]+)=(.*)$/s', $a, $m)) {
+                    $overrides[$m[1]] = $m[2];
+                }
             }
+            $req = self::prepare($def, !$dry, $state[$tier] ?? [], $tier, $overrides);
+            [$method, $url, $headers, $body] = [$req['method'], $req['url'], $req['headers'], $req['body']];
 
-            // Authorization: OAuth bearer token, or Basic for the token call itself.
-            $auth = $def['auth'] ?? 'bearer';
-            if ($auth === 'basic') {
-                $user = self::resolve((string)($def['basic']['username'] ?? '{{REST_ClientId}}'), $get, $strict);
-                $pass = self::resolve((string)($def['basic']['password'] ?? '{{REST_Secret}}'), $get, $strict);
-                $headers['Authorization'] = 'Basic ' . base64_encode($user . ':' . $pass);
-            } elseif ($auth === 'bearer') {
+            // Bearer token (the token call itself uses Basic, already set by prepare()).
+            if (($def['auth'] ?? 'bearer') === 'bearer') {
                 $headers['Authorization'] = 'Bearer ' . ($dry ? '<token>' : self::bearerToken($root, $tier, $state));
             }
-
-            $body = isset($def['body']) ? self::resolve((string)$def['body'], $get, $strict) : null;
 
             if ($dry) {
                 self::printDryRun($def, $method, $url, $headers, $body);
@@ -134,12 +142,60 @@ final class Client
         }
     }
 
+    /**
+     * Resolve one definition into a concrete request: method, URL, headers and
+     * body with every {{variable}} filled in. The bearer token is not included
+     * (run() adds it); Basic auth for the token call is.
+     *
+     * Public so tests can check every request without sending anything. In
+     * strict mode a variable with no value throws a RuntimeException naming it.
+     *
+     * @param array<string,mixed>  $def
+     * @param array<string,mixed>  $st    values captured by earlier requests (this tier)
+     * @param array<string,string> $overrides  NAME=value pairs from the command line (win over everything)
+     * @return array{method:string,url:string,headers:array<string,string>,body:?string}
+     */
+    public static function prepare(array $def, bool $strict, array $st = [], ?string $tier = null, array $overrides = []): array
+    {
+        $tier ??= self::tier();
+
+        // Shipment date offset: the script's own number, unless the run sets the override
+        // variable (shipDaysAhead, e.g. 0 = ship today), as the Postman collections allow.
+        $offset = (int)($def['dateOffset'] ?? 0);
+        if (isset($def['dateOffsetVar'])) {
+            $custom = $overrides[$def['dateOffsetVar']] ?? self::env((string)$def['dateOffsetVar']);
+            if ($custom !== null && is_numeric($custom)) {
+                $offset = (int)$custom;
+            }
+        }
+        $dyn  = self::dynamicVars($offset, isset($def['dateOffset']));
+        $get  = self::lookup($tier, $dyn, $st, $overrides);
+
+        $headers = [];
+        foreach (($def['headers'] ?? []) as $name => $value) {
+            $headers[(string)$name] = self::resolve((string)$value, $get, $strict);
+        }
+        if (($def['auth'] ?? '') === 'basic') {
+            $user = self::resolve((string)($def['basic']['username'] ?? '{{REST_ClientId}}'), $get, $strict);
+            $pass = self::resolve((string)($def['basic']['password'] ?? '{{REST_Secret}}'), $get, $strict);
+            $headers['Authorization'] = 'Basic ' . base64_encode($user . ':' . $pass);
+        }
+
+        return [
+            'method'  => (string)$def['method'],
+            'url'     => self::resolve((string)$def['url'], $get, $strict),
+            'headers' => $headers,
+            'body'    => isset($def['body']) ? self::resolve((string)$def['body'], $get, $strict) : null,
+        ];
+    }
+
     // ------------------------------------------------------------------ settings
 
     /** Load KEY=VALUE lines from .env without overriding real environment variables. */
     private static function loadEnvFile(string $file): void
     {
-        if (!is_file($file)) {
+        // The tests set PURO_NO_ENV_FILE so a real .env can never leak into them.
+        if (getenv('PURO_NO_ENV_FILE') !== false || !is_file($file)) {
             return;
         }
         foreach (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
@@ -158,6 +214,21 @@ final class Client
                 putenv("{$k}={$v}");
             }
         }
+    }
+
+    /** Read a setting: its own name, then the PUROLATOR_* alias, then PUROLATOR_VAR_<NAME>. */
+    private static function env(string $name): ?string
+    {
+        foreach ([$name, self::ENV_ALIASES[$name] ?? null, 'PUROLATOR_VAR_' . $name] as $key) {
+            if ($key === null) {
+                continue;
+            }
+            $v = getenv($key);
+            if ($v !== false && $v !== '') {
+                return $v;
+            }
+        }
+        return null;
     }
 
     private static function tier(): string
@@ -218,16 +289,21 @@ final class Client
      *
      * @param array<string,string> $dyn
      * @param array<string,mixed>  $st
+     * @param array<string,string> $overrides
      */
-    private static function lookup(string $tier, array $dyn, array $st): \Closure
+    private static function lookup(string $tier, array $dyn, array $st, array $overrides = []): \Closure
     {
-        $tierVars = self::TIERS[$tier] + ['rateBaseUrl' => self::TIERS[$tier]['baseUrl']];
-        return static function (string $name) use ($dyn, $st, $tierVars): ?string {
+        // rateBaseUrl follows a baseUrl override, so one setting redirects every request.
+        $tierVars = self::TIERS[$tier] + ['rateBaseUrl' => self::env('baseUrl') ?? self::TIERS[$tier]['baseUrl']];
+        return static function (string $name) use ($dyn, $st, $tierVars, $overrides): ?string {
+            if (isset($overrides[$name])) {
+                return $overrides[$name];
+            }
             if (isset($dyn[$name])) {
                 return $dyn[$name];
             }
-            $env = getenv($name);
-            if ($env !== false && $env !== '') {
+            $env = self::env($name);
+            if ($env !== null) {
                 return $env;
             }
             if (isset($st[$name]) && $st[$name] !== '') {
@@ -259,10 +335,17 @@ final class Client
 
     // ------------------------------------------------------------------ token + state
 
+    /** Where the token cache and captured PINs live. PURO_STATE_FILE overrides it (the tests use this). */
+    private static function statePath(string $root): string
+    {
+        $custom = getenv('PURO_STATE_FILE');
+        return ($custom !== false && $custom !== '') ? $custom : $root . '/.state.json';
+    }
+
     /** @return array<string,mixed> */
     private static function readState(string $root): array
     {
-        $file = $root . '/.state.json';
+        $file = self::statePath($root);
         $data = is_file($file) ? json_decode((string)file_get_contents($file), true) : null;
         return is_array($data) ? $data : [];
     }
@@ -270,15 +353,15 @@ final class Client
     /** @param array<string,mixed> $state */
     private static function writeState(string $root, array $state): void
     {
-        file_put_contents($root . '/.state.json', json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), LOCK_EX);
+        file_put_contents(self::statePath($root), json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), LOCK_EX);
     }
 
     /** @param array<string,mixed> $state */
     private static function bearerToken(string $root, string $tier, array $state): string
     {
         // A token supplied by hand wins.
-        $manual = getenv('REST_Token');
-        if ($manual !== false && $manual !== '') {
+        $manual = self::env('REST_Token');
+        if ($manual !== null) {
             return $manual;
         }
         // Otherwise reuse the cached one until shortly before it expires.
@@ -287,10 +370,10 @@ final class Client
             return (string)$st['REST_Token'];
         }
 
-        $id     = getenv('REST_ClientId');
-        $secret = getenv('REST_Secret');
+        $id     = self::env('REST_ClientId');
+        $secret = self::env('REST_Secret');
         if (!$id || !$secret) {
-            throw new RuntimeException('REST_ClientId and REST_Secret are needed to get a token. Set them in .env (see .env.example).');
+            throw new RuntimeException('REST_ClientId and REST_Secret (or PUROLATOR_CLIENT_ID and PUROLATOR_CLIENT_SECRET) are needed to get a token. Set them in .env (see .env.example).');
         }
         $base = self::TIERS[$tier]['baseUrl'];
         $res  = self::send('POST', $base . '/auth/v1/token', [

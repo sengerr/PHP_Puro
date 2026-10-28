@@ -1,0 +1,62 @@
+<?php
+/**
+ * SAMPLE · Domestic · Track V2 Proof of Delivery
+ *
+ * POST /track/v1/shipment   (folder: 05 · Tracking)
+ *
+ * **Spec-aligned 2026-10-24, not yet verified live** -- changed to match the published OpenAPI spec after it failed (or was not sent) in the 2026-10-06 run.
+ *
+ * Team sample “POD request” — sources/reference-collections/Purolator_API_Project_PROD.postman_collection.json.
+ * Naming: SAMPLE · Lane · Focus (tooling/add_team_samples.py). Addresses on the standard fixtures. Not verified live.
+ * Converted from SOAP TrackingByPinsOrReferencesRequest. SOAP v2 tracking already uses the REST search field names — mapped through directly.
+ *
+ * ### Developer notes
+ * `POST /track/v1/shipment` -- Tracking spec (TrackingSearchCriteria). search by tracking id or reference
+ *
+ * **Headers:** Authorization Bearer `{{REST_Token}}` · `x-api-key` (required)
+ *
+ * **Required fields** (top level, and inside every object this body sends): `search[].trackingId`
+ *
+ * **Fields in this body** (type, limits, accepted values; * = required):
+ * - `language` -- string
+ * - `search` -- array
+ * - `search[].trackingId`* -- string
+ * - `search[].account` -- string
+ * - `search[].eventSortOrder` -- string
+ *
+ * Full value lists: `docs/REST-enumerations-and-accepted-values.md`.
+ *
+ * Run:  php examples/05-tracking/sample-domestic-track-v2-proof-of-delivery.php [NAME=value ...]
+ * Tier: PUROLATOR_ENV=dev (default) or prod -- see README.md for every variable.
+ */
+
+declare(strict_types=1);
+
+require __DIR__ . '/../../src/PurolatorClient.php';
+
+use PhpPuro\PurolatorClient;
+
+// Sample values from the Postman collection; override with NAME=value or PUROLATOR_VAR_<NAME>.
+$defaults = [];
+$vars = array_merge($defaults, PurolatorClient::argVars($argv));
+
+// Request body exactly as in the collection; {{placeholders}} are filled below.
+$template = <<<'JSON_BODY'
+{
+    "language": "{{language}}",
+    "search": [
+        {
+            "trackingId": "{{PIN}}",
+            "account": "{{AccountNumber}}",
+            "eventSortOrder": "d"
+        }
+    ]
+}
+JSON_BODY;
+
+$body = PurolatorClient::fill($template, $vars, false);
+$query = [];
+$headers = [];
+
+$client = new PurolatorClient();                   // tier from PUROLATOR_ENV
+PurolatorClient::show($client->request('POST', '/track/v1/shipment', $body, $query, $headers));

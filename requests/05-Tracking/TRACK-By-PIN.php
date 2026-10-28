@@ -25,6 +25,23 @@ return \Puro\Client::runIfMain([
     'auth'   => 'bearer',
     'description' => <<<'PURO_TEXT'
 Converted from SOAP TrackingServiceEndpoint.TrackPackagesByPin — test-aid case “02.Track you pin”.
+
+<!-- developer-notes:begin (tooling/align_rest_to_spec.py; regenerated, do not edit) -->
+### Developer notes
+`POST /track/v1/shipment` -- Tracking spec (TrackingSearchCriteria). search by tracking id or reference
+
+**Headers:** Authorization Bearer `{{REST_Token}}` · `x-api-key` (required)
+
+**Required fields** (top level, and inside every object this body sends): `search[].trackingId`
+
+**Fields in this body** (type, limits, accepted values; * = required):
+- `language` -- string
+- `search` -- array
+- `search[].trackingId`* -- string
+- `search[].pod` -- boolean
+
+Full value lists: `docs/REST-enumerations-and-accepted-values.md`.
+<!-- developer-notes:end -->
 PURO_TEXT,
     'body' => <<<'PURO_BODY'
 {

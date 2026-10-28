@@ -81,12 +81,30 @@ function captureFrom(array $scripts): ?array
     return ['vars' => $vars, 'keys' => $docOrSeed ? ['shipmentpin', 'pin'] : ['shipmentpin']];
 }
 
-/** Days added to the shipment date, from "const DAYS_AHEAD = 5;" in the pre-request script. */
-function dateOffsetFrom(array $scripts): ?int
+/**
+ * Days added to the shipment date, read from the pre-request script. Two forms exist:
+ *   const DAYS_AHEAD = 5;
+ *   const DAYS_AHEAD = (_ahead === undefined || ...) ? 5 : Number(_ahead);   // _ahead = shipDaysAhead
+ * Returns [days, overrideVariable|null], or null when the request has no such script.
+ *
+ * @return array{0:int,1:?string}|null
+ */
+function dateOffsetFrom(array $scripts): ?array
 {
     foreach ($scripts as $s) {
-        if (($s['type'] ?? '') === 'beforeRequest' && preg_match('/const DAYS_AHEAD\s*=\s*(\d+)/', $s['code'] ?? '', $m)) {
-            return (int)$m[1];
+        if (($s['type'] ?? '') !== 'beforeRequest') {
+            continue;
+        }
+        $code = (string)($s['code'] ?? '');
+        if (preg_match('/const DAYS_AHEAD\s*=\s*(\d+)\s*;/', $code, $m)) {
+            return [(int)$m[1], null];
+        }
+        if (preg_match('/const DAYS_AHEAD\s*=.*\?\s*(\d+)\s*:\s*Number\(_ahead\)/', $code, $m)) {
+            $var = preg_match("/pm\.variables\.get\('([A-Za-z0-9_]+)'\)/", $code, $v) ? $v[1] : null;
+            return [(int)$m[1], $var];
+        }
+        if (str_contains($code, 'DAYS_AHEAD')) {
+            throw new RuntimeException('Unrecognised DAYS_AHEAD script; update dateOffsetFrom() in tools/convert_yaml.php');
         }
     }
     return null;
@@ -180,7 +198,10 @@ foreach ($folders as $folder) {
             $php .= "    'basic'  => ['username' => " . q((string)($c['username'] ?? '')) . ", 'password' => " . q((string)($c['password'] ?? '')) . "],\n";
         }
         if ($offset !== null) {
-            $php .= "    'dateOffset' => {$offset},\n";
+            $php .= "    'dateOffset' => {$offset[0]},\n";
+            if ($offset[1] !== null) {
+                $php .= "    'dateOffsetVar' => " . q($offset[1]) . ",\n";   // a run may override the offset with this variable
+            }
         }
         if ($capture !== null) {
             if (isset($capture['token'])) {
