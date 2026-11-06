@@ -1,6 +1,6 @@
 # PHP_Puro: Purolator REST API examples in plain PHP
 
-These are PHP versions of every REST request in the [Purolator_2026](https://github.com/sengerr/Purolator_2026) Postman collections. Each request has one script, and there are 420 in total.
+These are PHP versions of every REST request in the [Purolator_2026](https://github.com/sengerr/Purolator_2026) Postman collections. Each request has one script, and there are 450 in total — including folder `16 · Verified in Production 2026-11-06` (30 requests sent once in Production on 2026-11-06 and voided).
 
 - **Plain PHP 8.1+ and the cURL extension.** You do not need Composer or any packages.
 - **One client class:** `src/PurolatorClient.php`. It fetches the token and sets the headers (`Authorization: Bearer`, `x-api-key`, `RequestReference`, `Language`).
@@ -14,6 +14,8 @@ These are PHP versions of every REST request in the [Purolator_2026](https://git
 | `prod` | `https://shipapi.purolator.com` | `portal_api` |
 
 > **Production creates real shipments, pickups and charges.** Use `dev` until your integration is certified.
+
+**Pickups (folder 16):** run *Schedule pickup* first. In `requests/` its confirmation number is saved automatically and *Modify*, *Pickup history* and *Void pickup* reuse it. In `examples/`, pass it yourself: `PickUpConfirmationNumber=<number>`.
 
 ---
 
@@ -165,7 +167,7 @@ It rebuilds `examples/` from scratch. It does not touch `src/` or this README.
 
 # Second script set: `requests/`, Postman collections and tests
 
-This repository holds two script sets generated from the same Purolator_2026 requests (420 each). `examples/` and `src/PurolatorClient.php` are described above. The set below adds a second client, ready-made Postman collections, and tests.
+This repository holds two script sets generated from the same Purolator_2026 requests (450 each). `examples/` and `src/PurolatorClient.php` are described above. The set below adds a second client, ready-made Postman collections, and tests.
 
 | | `examples/` (above) | `requests/` (this section) |
 |---|---|---|
@@ -231,7 +233,7 @@ Thirteen requests are marked *Spec-aligned, not yet verified live* in their desc
 ## Tests
 
 ```bat
-:: PHP: 420 scripts, variable and PIN-chain checks, collection consistency,
+:: PHP: 450 scripts, variable and PIN-chain checks, collection consistency,
 :: and an end-to-end run of every folder against a local mock API
 php tests\run.php
 

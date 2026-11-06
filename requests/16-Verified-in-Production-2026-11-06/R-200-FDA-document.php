@@ -1,0 +1,119 @@
+<?php
+/**
+ * 16 · Verified in Production 2026-11-06 / R-200 · FDA document
+ * POST {{baseUrl}}/ship/v1/shipment
+ *
+ * Run:  php requests/16-Verified-in-Production-2026-11-06/R-200-FDA-document.php [--dry-run] [--save]
+ * Needs: REST_ClientId, REST_Secret, REST_XApiKey, AccountNumber (.env or environment)
+ */
+declare(strict_types=1);
+
+require_once dirname(__DIR__, 2) . '/src/Client.php';
+
+return \Puro\Client::runIfMain([
+    'folder' => '16 · Verified in Production 2026-11-06',
+    'name'   => 'R-200 · FDA document',
+    'order'  => 2900,
+    'method' => 'POST',
+    'url'    => '{{baseUrl}}/ship/v1/shipment',
+    'headers' => [
+        'x-api-key' => '{{REST_XApiKey}}',
+        'RequestReference' => '{{RequestReference}}',
+        'Language' => '{{language}}',
+        'Content-Type' => 'application/json',
+    ],
+    'auth'   => 'bearer',
+    'description' => <<<'PURO_TEXT'
+Verified in Production 2026-11-06 — Purolator_Certification_Testing row R-200 (FDA document).
+Expected outcome: HTTP 200 · validShipment: true · shipmentPIN returned · packagePINs returned · documentStatus: Completed · banner: "Quote is subject to change based on actual shipment characte…"
+Placeholders in the body: AccountNumber, Current_Date.
+Production calls create real shipments and pickups — void anything you create.
+PURO_TEXT,
+    'body' => <<<'PURO_BODY'
+{
+  "lineOfBusiness": "COURIER",
+  "shipmentDate": "{{Current_Date}}",
+  "validateOnly": false,
+  "returnsManagement": false,
+  "returnRates": false,
+  "outboundShipment": {
+    "pickupType": "DROPOFF",
+    "senderInformation": {
+      "attentionTo": "Tech A",
+      "companyName": "Purolator",
+      "streetAddress": [
+        "17718 114 Ave"
+      ],
+      "city": "Edmonton",
+      "provinceStateCode": "AB",
+      "country": "CA",
+      "postalZipCode": "T5S2N4",
+      "phoneNumber": "17804091270"
+    },
+    "receiverInformation": {
+      "attentionTo": "Retail Agent",
+      "streetAddress": [
+        "2310 East Gladwick Street"
+      ],
+      "city": "Compton",
+      "provinceStateCode": "CA",
+      "country": "US",
+      "postalZipCode": "90220",
+      "phoneNumber": "18004595599"
+    },
+    "shipmentInformation": {
+      "serviceId": "PurolatorExpressBoxU.S.",
+      "unitOfMeasurement": "IMPERIAL",
+      "descriptionOfGoods": "Consolidation check",
+      "totalWeight": 5,
+      "totalPackages": 1,
+      "dangerousGoodsDeclarationDocumentIndicator": false,
+      "packageInformation": [
+        {
+          "packageWeight": 5,
+          "packageLength": 11,
+          "packageWidth": 8,
+          "packageHeight": 1
+        }
+      ]
+    },
+    "crossBorderInformation": {
+      "nonDocumentsInformation": {
+        "importExportType": "Permanent",
+        "customsInvoiceDocumentIndicator": true
+      },
+      "contentDetails": [
+        {
+          "description": "Wireless Router",
+          "harmonizedCode": "8517620090",
+          "countryOfManufacture": "CN",
+          "unitValue": 120,
+          "productCode": "WR-AX6000",
+          "quantity": 1,
+          "usmcaDocumentIndicator": false,
+          "fdaDocumentIndicator": true,
+          "senderIsProducerIndicator": true,
+          "textileIndicator": false
+        }
+      ]
+    },
+    "paymentInformation": {
+      "paymentType": "Sender",
+      "registeredAccountNumber": "{{AccountNumber}}",
+      "billingAccountNumber": "{{AccountNumber}}"
+    },
+    "customerReferenceInformation": {
+      "costCenter": "Consolidation",
+      "shipmentReference1": "PO123456"
+    }
+  },
+  "shipmentDocuments": {
+    "label": {
+      "outputType": "ZPL",
+      "printerFormat": "thermal",
+      "responseType": "BASE64"
+    }
+  }
+}
+PURO_BODY,
+], __FILE__);

@@ -208,6 +208,8 @@ final class PurolatorClient
             'Current_Date'            => self::shipmentDate($isShipment ? (int) (self::env('PUROLATOR_SHIP_DAYS_AHEAD') ?? '5') : 0),
             // Summary manifest dates must fall in today-10 .. today; default yesterday.
             'manifestDate'            => self::shipmentDate(-1),
+            // Pickups go on the next business day (same rule as the requests/ client).
+            'pickupDate'              => self::pickupDate(),
             'RequestReference'        => self::requestReference(),
             'language'                => self::language(),
             default                   => null,
@@ -236,6 +238,16 @@ final class PurolatorClient
     {
         $d = new \DateTimeImmutable('now', new \DateTimeZone('America/Toronto'));
         return $d->modify(($daysAhead >= 0 ? '+' : '') . $daysAhead . ' days')->format('Y-m-d');
+    }
+
+    /** Next business day in Purolator's timezone, YYYY-MM-DD (skips Saturday and Sunday). */
+    public static function pickupDate(): string
+    {
+        $d = (new \DateTimeImmutable('now', new \DateTimeZone('America/Toronto')))->modify('+1 day');
+        while ((int) $d->format('N') >= 6) {          // 6 = Saturday, 7 = Sunday
+            $d = $d->modify('+1 day');
+        }
+        return $d->format('Y-m-d');
     }
 
     /** "REQ" + YYYYMMDDHHMMSS -- the same convention as the Postman collections. */

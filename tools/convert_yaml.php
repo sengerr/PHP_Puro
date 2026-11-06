@@ -73,6 +73,10 @@ function captureFrom(array $scripts): ?array
     if (preg_match('/environment\.set\(\'PIN\'/', $live)) {
         $vars[] = 'PIN';
     }
+    // Schedule-pickup requests save the pickup confirmation number instead of a PIN.
+    if (preg_match('/const PICKUP_VAR = [\'"]([A-Za-z0-9_]+)[\'"]/', $live, $m)) {
+        return ['vars' => [$m[1]], 'keys' => ['pickupconfirmationnumber']];
+    }
     $vars = array_values(array_unique($vars));
     if (!$vars) {
         return null;

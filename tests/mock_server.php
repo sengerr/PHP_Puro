@@ -68,4 +68,9 @@ if ($path === '/ship/v1/shipment') {
     reply(200, ['validShipment' => true, 'shipmentDetails' => ['shipmentPIN' => '329000000001', 'packagePINs' => ['329000000002']]]);
     return;
 }
+// Scheduling a pickup returns the confirmation number that modify / history / void reuse.
+if ($path === '/pickup/v1/schedule') {
+    reply(200, ['pickupConfirmationNumber' => '12345678']);
+    return;
+}
 reply(200, ['ok' => true, 'path' => $path]);
