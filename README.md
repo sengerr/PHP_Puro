@@ -277,3 +277,12 @@ tests\                     run.php, collection_scripts.js, mock_server.php
 
 - Never commit `.env`, `.state.json` or `output\` (all git-ignored), or any Postman environment.
 - Only requests from Purolator_2026 belong here; its README says which ones are verified live.
+
+
+## File formats
+
+- `postman/collections/Purolator REST — Development|Production/` — Postman **v3 collection format** (Native Git YAML), copied from Purolator_2026.
+- `collections/*.postman_collection.json` — Postman **v2.1 JSON** of the same REST collections.
+- No environments are committed in this repo; use `.env` (from `.env.example`) locally.
+- `openapi/purolator-rest.openapi.yaml` / `.json` — all of Purolator's REST services merged into one OpenAPI 3.0.3 document, with Development, Certification and Production servers. Components that differ between services carry a service prefix (e.g. `Estimate_Tax`); two defects in Purolator's published specs are repaired here and listed in `info.description`.
+- `openapi/services/*.yaml` / `.json` — Purolator's nine published per-service specs, unchanged (YAML as published, JSON converted from it). SOAP is described by the WSDLs; OpenAPI covers REST only.
